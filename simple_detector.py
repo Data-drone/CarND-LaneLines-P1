@@ -8,6 +8,9 @@
 import cv2
 import numpy as np
 from typing import Tuple
+import logging
+logger = logging.getLogger(__name__)
+
 
 def read_video(vid_path: str) -> Tuple[np.ndarray, np.ndarray] :
     """
@@ -18,10 +21,13 @@ def read_video(vid_path: str) -> Tuple[np.ndarray, np.ndarray] :
     cap = cv2.VideoCapture(vid_path)
 
     while(True):
+        logger.debug('loaded {0}: '.format(vid_path))
         ret, frame = cap.read()
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frame_shape = rgb.shape
-        yield rgb, frame_shape
+        return rgb, frame_shape
+    
+    return
 
 
 def grayscale(img: np.ndarray) -> np.ndarray:
@@ -29,21 +35,21 @@ def grayscale(img: np.ndarray) -> np.ndarray:
     grayscales rgb images
     """
 
-    yield cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    return cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
 def canny(img: np.ndarray, low_threshold: int, high_threshold: int) -> np.ndarray:
     """
     applies canny edge detector to image
     """
 
-    yield cv2.cvtCanny(img, low_threshold, high_threshold)
+    return cv2.Canny(img, low_threshold, high_threshold)
 
 def gaussian_blur(img: np.ndarray, kernel_size: int) -> np.ndarray:
     """
     applies a guassian blur
     """
 
-    yield cv2.GaussianBlur(img, (kernel_size, kernel_size), 0)
+    return cv2.GaussianBlur(img, (kernel_size, kernel_size), 0)
 
 def region_of_interest(img: np.ndarray, vertices: np.ndarray) -> np.ndarray:
     """
@@ -68,7 +74,7 @@ def region_of_interest(img: np.ndarray, vertices: np.ndarray) -> np.ndarray:
     
     #returning the image only where mask pixels are nonzero
     masked_image = cv2.bitwise_and(img, mask)
-    yield masked_image
+    return masked_image
 
 def find_lines(img: np.ndarray, lines: list) -> list:
     """
@@ -111,11 +117,22 @@ def find_lines(img: np.ndarray, lines: list) -> list:
                         l_x_mid = x2
                     if y2 < l_y_mid:
                         l_y_mid = y2
-    
-    # output coordinary and gradient array
-    output = list([l_x, l_y, l_x_mid, l_y_mid], [r_x, r_y, r_x_mid, r_y_mid])
 
-    yield output
+    if r_y < 0.95*img.shape[0]:
+        x_extrap = (img.shape[0]-r_y)/r_grad + r_x
+        r_x = int(x_extrap)
+        r_y = int(img.shape[0])
+    
+    # extra fill line
+    if l_y < 0.95*img.shape[0]:
+        l_x_extrap = (img.shape[0]-l_y)/l_grad + l_x # check
+        l_x = int(l_x_extrap)
+        l_y = int(img.shape[0])
+
+    # output coordinary and gradient array
+    output = [[l_x, l_y, l_x_mid, l_y_mid], [r_x, r_y, r_x_mid, r_y_mid]]
+
+    return output
 
 def hough_lines(img: np.ndarray, rho: int, theta: int, threshold: int, min_line_len: int, max_line_grap: int) -> list:
     """
@@ -123,7 +140,7 @@ def hough_lines(img: np.ndarray, rho: int, theta: int, threshold: int, min_line_
     """
     lines = cv2.HoughLinesP(img, rho, theta, threshold, np.array([]), minLineLength=min_line_len, maxLineGap=max_line_grap)
 
-    yield lines
+    return lines
 
 def draw_lines(img: np.ndarray, lines: list, color: list = [255,0,0], thickness: int=2) -> np.ndarray:
     """
@@ -131,17 +148,15 @@ def draw_lines(img: np.ndarray, lines: list, color: list = [255,0,0], thickness:
     lines is of format [x1,y1,x2,y2]
     """
     line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
-    if not np.isnan(lines):
-
-        for line in lines:
-            cv2.line(line_img, (line[0], line[1]), (line[2], line[3]), color, thickness)
+    for line in lines:
+        cv2.line(line_img, (line[0], line[1]), (line[2], line[3]), color, thickness)
     
-    yield line_img
+    return line_img
 
 def weighted_img(img: np.ndarray, initial_img: np.ndarray, α:float=0.8, β:float=1., γ:float=0.):
     """
     merge lines and original image
     """
-    yield cv2.addWeighted(initial_img, α, img, β, γ)
+    return cv2.addWeighted(initial_img, α, img, β, γ)
 
 
